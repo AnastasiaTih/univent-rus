@@ -1,0 +1,236 @@
+{
+  "name": "Innovation AI Agent - Multilingual Prototype",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prototype-ai",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "59b09a91-a8f8-454f-bc5a-bfe0948668ec",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1264,
+        -16
+      ],
+      "webhookId": "prototype-ai"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json ?? {};\nconst rawMessage = String(body.message ?? body.text ?? body.prompt ?? '').trim();\nconst action = String(body.action ?? body.intent ?? 'chat').trim();\nconst sessionId = String(body.sessionId ?? 'project-neuro-interface-01').trim();\nconst context = body.context ?? {};\nconst project = context.project ?? body.project ?? {};\nconst material = context.material ?? body.material ?? {};\nconst session = context.session ?? body.session ?? {};\nconst history = Array.isArray(body.history) ? body.history : [];\n\nconst langRaw = String(body.lang ?? context.lang ?? body.locale ?? '').toLowerCase();\nconst lang = langRaw.startsWith('ru') ? 'ru' : 'en';\n\nfunction stripHtml(value) {\n  return String(value ?? '')\n    .replace(/<[^>]*>/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction short(value, max = 220) {\n  const text = String(value ?? '').trim();\n  if (text.length <= max) return text;\n  return text.slice(0, max - 1).trimEnd() + '…';\n}\n\nfunction parseMedia(input, kind = 'image') {\n  if (!input) return null;\n\n  let dataUrl = '';\n  let fileName = String(input.fileName ?? input.name ?? `${kind}-${Date.now()}.${kind === 'audio' ? 'webm' : 'jpg'}`);\n  let mimeType = String(input.mimeType ?? input.type ?? (kind === 'audio' ? 'audio/webm' : 'image/jpeg'));\n  let capturedAt = String(input.capturedAt ?? input.timestamp ?? new Date().toISOString());\n  let note = String(input.note ?? (lang === 'ru' ? (kind === 'audio' ? 'Аудио сессии' : 'Фото сессии') : (kind === 'audio' ? 'Session audio' : 'Session photo')));\n  let width = Number(input.width ?? 0);\n  let height = Number(input.height ?? 0);\n\n  if (typeof input === 'string') {\n    dataUrl = input;\n  } else {\n    dataUrl = String(input.dataUrl ?? input.data ?? input.base64 ?? '');\n  }\n\n  if (!dataUrl) return null;\n\n  if (!dataUrl.startsWith('data:')) {\n    const safeMime = mimeType.startsWith(`${kind}/`) ? mimeType : (kind === 'audio' ? 'audio/webm' : 'image/jpeg');\n    return { dataUrl: `data:${safeMime};base64,${dataUrl}`, fileName, mimeType: safeMime, capturedAt, note, width, height };\n  }\n\n  const match = dataUrl.match(/^data:([^;]+);base64,(.*)$/);\n  if (!match) return null;\n\n  mimeType = match[1] || mimeType || (kind === 'audio' ? 'audio/webm' : 'image/jpeg');\n  return { dataUrl, fileName, mimeType, capturedAt, note, width, height };\n}\n\nfunction detectIntent(message, actionName) {\n  const lower = String(message ?? '').toLowerCase();\n  const contains = (...parts) => parts.some((part) => lower.includes(part));\n\n  if (actionName === 'session_end') return 'summary';\n  if (actionName === 'session_summary') return 'summary';\n  if (actionName === 'session_note') return 'session';\n  if (actionName === 'session_live') return 'session';\n  if (actionName === 'session_photo') return 'photo';\n  if (actionName === 'photo') return 'photo';\n  if (actionName === 'project_context') return 'project';\n  if (actionName === 'material_context') return 'memory';\n  if (actionName === 'role') return 'roles';\n  if (actionName === 'analogy') return 'analogy';\n  if (actionName === 'analytics') return 'analytics';\n  if (actionName === 'trigger') return 'challenge';\n  if (actionName === 'next_step') return 'next_step';\n\n  if (!message) return 'empty';\n\n  if (lang === 'ru') {\n    if (contains('фото', 'снимок', 'изображ', 'кадр', 'камера')) return 'photo';\n    if (contains('конспект', 'итог', 'сводка', 'summary')) return 'summary';\n    if (contains('роль', 'роли', 'делег', 'перераспредел', 'передай')) return 'roles';\n    if (contains('аналог', 'аналогия', 'пример из другой', 'другой индустр', 'кейс из')) return 'analogy';\n    if (contains('паттерн', 'динамик', 'нагруз', 'асимметр', 'застрял', 'туннел', 'зацик')) return 'analytics';\n    if (contains('следующ', 'что дальше', 'next step', 'какой шаг', 'логичн')) return 'next_step';\n    if (contains('сесси', 'запись', 'фиксац', 'активир', 'старт')) return 'session';\n    if (contains('вызов', 'challenge', 'челлендж')) return 'challenge';\n    if (contains('материал', 'документ', 'файл', 'pdf', 'изображ', 'фото')) return 'memory';\n    if (contains('помоги', 'совет', 'рекомендац', 'подсказ')) return 'advice';\n    if (contains('проект', 'кейс', 'компания', 'университет')) return 'project';\n    return 'general';\n  }\n\n  if (contains('photo', 'snapshot', 'image', 'frame', 'camera', 'picture')) return 'photo';\n  if (contains('notes', 'summary', 'outcome', 'recap')) return 'summary';\n  if (contains('role', 'roles', 'delegate', 'redistribute', 'transfer')) return 'roles';\n  if (contains('analog', 'analogy', 'example from', 'other industry', 'case from')) return 'analogy';\n  if (contains('pattern', 'dynamic', 'load', 'asymmetry', 'stuck', 'tunnel', 'loop')) return 'analytics';\n  if (contains('next', 'what next', 'next step', 'what step', 'logical')) return 'next_step';\n  if (contains('session', 'record', 'capture', 'activate', 'start')) return 'session';\n  if (contains('call', 'challenge', 'trigger')) return 'challenge';\n  if (contains('material', 'document', 'file', 'pdf')) return 'memory';\n  if (contains('help', 'advice', 'recommendation', 'hint', 'suggest')) return 'advice';\n  if (contains('project', 'case', 'company', 'university')) return 'project';\n  return 'general';\n}\n\nconst photo = parseMedia(body.photo ?? session.photo ?? context.photo ?? body.sessionPhoto ?? body.photoData, 'image');\nconst audio = parseMedia(body.audio ?? session.audio ?? context.audio ?? body.sessionAudio ?? body.audioData, 'audio');\nconst intent = detectIntent(rawMessage, action);\nconst projectTitle = String(project.title ?? project.projectTitle ?? (lang === 'ru' ? 'Проект' : 'Project')).trim();\nconst company = String(project.company ?? project.source ?? '').trim();\nconst university = String(project.university ?? '').trim();\nconst phase = String(project.phase ?? context.phase ?? (lang === 'ru' ? 'Создание' : 'Creation')).trim();\nconst materialTitle = String(material.title ?? context.materialTitle ?? '').trim();\nconst materialMeta = String(material.meta ?? '').trim();\nconst audioTranscript = String(body.audioTranscript ?? session.audioTranscript ?? context.audioTranscript ?? '').trim();\n\nconst projectDescriptor = [\n  projectTitle,\n  company ? (lang === 'ru' ? `источник: ${company}` : `source: ${company}`) : '',\n  university ? (lang === 'ru' ? `университет: ${university}` : `university: ${university}`) : '',\n  project.case ? (lang === 'ru' ? `кейс: ${project.case}` : `case: ${project.case}`) : '',\n  phase ? (lang === 'ru' ? `фаза: ${phase}` : `phase: ${phase}`) : ''\n].filter(Boolean).join(' · ');\n\nconst materialDescriptor = materialTitle\n  ? [materialTitle, materialMeta ? `(${materialMeta})` : ''].filter(Boolean).join(' ')\n  : '';\n\nconst contextSummary = [\n  `${lang === 'ru' ? 'Тип контекста' : 'Context type'}: ${String(context.type ?? 'general')}`,\n  projectDescriptor ? `${lang === 'ru' ? 'Проект' : 'Project'}: ${projectDescriptor}` : '',\n  materialDescriptor ? `${lang === 'ru' ? 'Материал' : 'Material'}: ${materialDescriptor}` : '',\n  photo ? `${lang === 'ru' ? 'Фото' : 'Photo'}: ${photo.fileName} · ${photo.mimeType}` : '',\n  audio ? `${lang === 'ru' ? 'Аудио' : 'Audio'}: ${audio.fileName} · ${audio.mimeType}` : '',\n  session.active ? `${lang === 'ru' ? 'Сессия' : 'Session'}: active` : `${lang === 'ru' ? 'Сессия' : 'Session'}: inactive`,\n  session.location ? `${lang === 'ru' ? 'Локация' : 'Location'}: ${session.location}` : '',\n  session.lastAction ? `${lang === 'ru' ? 'Последнее действие' : 'Last action'}: ${session.lastAction}` : '',\n  history.length ? `${lang === 'ru' ? 'История диалога' : 'Dialogue history'}: ${history.slice(-4).map((m) => `${m.role || 'user'}: ${short(m.text || m.content || '', 80)}`).join(' | ')}` : ''\n].filter(Boolean).join('\\n');\n\nconst transcriptText = Array.isArray(session.transcript)\n  ? session.transcript.map((m) => `- ${m.role || 'user'}: ${short(m.text || m.content || '', 140)}`).join('\\n')\n  : '';\n\nconst photoPrompt = photo\n  ? (lang === 'ru'\n    ? `Есть фото сессии. Используй инструмент анализа изображения перед ответом.`\n    : `There is a session photo. Use the image analysis tool before responding.`)\n  : '';\n\nconst audioPrompt = audioTranscript\n  ? (lang === 'ru'\n    ? `Есть аудиотранскрипт сессии. Используй его как живой контекст.`\n    : `There is a session audio transcript. Use it as live context.`)\n  : '';\n\nconst mode = (action === 'session_live' || action === 'session_note' || action === 'session_end' || intent === 'summary' || intent === 'roles' || intent === 'analogy' || intent === 'analytics' || intent === 'challenge' || intent === 'photo')\n  ? 'proactive'\n  : 'background';\n\nconst recommendedActions = (() => {\n  if (lang === 'ru') {\n    if (intent === 'summary') return ['📋 Сохранить конспект', '🧩 Зафиксировать решения', '➡️ Перейти к следующей фазе'];\n    if (intent === 'roles') return ['🔄 Согласовать роли', '👥 Проверить загрузку', '📌 Зафиксировать задачи'];\n    if (intent === 'analogy') return ['💡 Сверить аналогию с кейсом', '📚 Открыть смежные материалы', '🗣️ Обсудить с командой'];\n    if (intent === 'analytics') return ['📊 Проверить асимметрию участия', '⏱️ Сверить паузы', '🧭 Уточнить следующий шаг'];\n    if (intent === 'photo') return ['📷 Разобрать фото', '📋 Сохранить как материал', '💡 Сформулировать следующий шаг'];\n    if (intent === 'session') return ['🎙 Продолжить фиксацию', '📋 Создать конспект', '💾 Сохранить материал'];\n    if (intent === 'challenge') return ['⚡ Запустить мини-вызов', '🔁 Переключить формат', '🧪 Перейти к прототипированию'];\n    if (intent === 'project') return ['🏢 Уточнить требования кейса', '🎓 Проверить контекст команды', '➡️ Предложить следующий шаг'];\n    if (intent === 'memory') return ['📚 Привязать к фазе', '🔎 Найти связанные артефакты', '📋 Сформировать краткий конспект'];\n    return ['💡 Уточнить контекст', '📋 Сформировать краткий конспект', '➡️ Предложить следующий шаг'];\n  }\n\n  if (intent === 'summary') return ['📋 Save notes', '🧩 Capture decisions', '➡️ Move to next phase'];\n  if (intent === 'roles') return ['🔄 Align roles', '👥 Check workload', '📌 Record tasks'];\n  if (intent === 'analogy') return ['💡 Compare with the case', '📚 Open related materials', '🗣️ Discuss with the team'];\n  if (intent === 'analytics') return ['📊 Check participation asymmetry', '⏱️ Review pauses', '🧭 Clarify the next step'];\n  if (intent === 'photo') return ['📷 Review the photo', '📋 Save as material', '💡 Define the next step'];\n  if (intent === 'session') return ['🎙 Continue capturing', '📋 Create notes', '💾 Save material'];\n  if (intent === 'challenge') return ['⚡ Launch a mini-challenge', '🔁 Switch format', '🧪 Start prototyping'];\n  if (intent === 'project') return ['🏢 Clarify case requirements', '🎓 Check team context', '➡️ Suggest the next step'];\n  if (intent === 'memory') return ['📚 Link to phase', '🔎 Find related artifacts', '📋 Create a short summary'];\n  return ['💡 Clarify context', '📋 Create a short summary', '➡️ Suggest the next step'];\n})();\n\nconst contextPrompt = lang === 'ru'\n  ? `\nТы ИИ-агент гибридной университетско-корпоративной платформы.\nТвоя роль: советник, хранитель коллективной памяти и аналитик динамики.\nНе принимай стратегические решения за команду и не меняй материалы без подтверждения человека.\nВсе рекомендации помечай как совет/рекомендация.\nОтвечай по-русски, кратко и по делу.\nЕсли в контексте есть фото или аудиозапись сессии, обязательно используй соответствующий инструмент перед ответом.\nЕсли данных не хватает — задай один уточняющий вопрос.\nЕсли запрос про конспект — дай структуру: тезисы, решения, открытые вопросы, следующий шаг.\nЕсли запрос про аналитику — дай короткий диагностический отчёт.\nЕсли запрос про аналогии — дай 2–3 смежных примера и объясни, как они помогают.\nЕсли запрос про сессию — помоги с фиксацией диалога, ролями, записью и сохранением материала.\n`.trim()\n  : `\nYou are an AI agent for a hybrid university-corporate platform.\nYour role: advisor, keeper of collective memory, and dynamics analyst.\nDo not make strategic decisions for the team and do not change materials without human confirmation.\nMark all recommendations as advice/recommendation.\nRespond in English, briefly and to the point.\nIf there is a session photo or audio recording in the context, use the appropriate tool before responding.\nIf there is not enough data, ask one clarifying question.\nIf the request is about notes/summary - give a structure: key points, decisions, open questions, next step.\nIf the request is about analytics - give a short diagnostic report.\nIf the request is about analogies - give 2-3 examples and explain applicability.\nIf the request is about a session - help with dialogue capture, roles, recording, and saving materials.\n`.trim();\n\nconst prompt = `\n${contextPrompt}\n\n${contextSummary ? `${lang === 'ru' ? 'КОНТЕКСТ' : 'CONTEXT'}:\\n${contextSummary}` : ''}\n\n${photoPrompt ? `\\n${photoPrompt}\\n` : ''}\n\n${audioPrompt ? `\\n${audioPrompt}\\n` : ''}\n\n${transcriptText ? `${lang === 'ru' ? 'ТРАНСКРИПТ СЕССИИ' : 'SESSION TRANSCRIPT'}:\\n${transcriptText}` : ''}\n\n${lang === 'ru' ? 'ЗАПРОС ПОЛЬЗОВАТЕЛЯ' : 'USER REQUEST'}:\n${rawMessage || (lang === 'ru' ? 'Сформулируй полезный совет по текущему контексту.' : 'Formulate useful advice based on the current context.')}\n\n${lang === 'ru'\n  ? `Требуемый стиль ответа:\n- 1–4 коротких абзаца;\n- при необходимости 2–3 маркера;\n- обязательно учитывать выбранный контекст;\n- не выдумывать деталей, которых нет в контексте;\n- не писать, что ты не можешь что-то сделать, если можно дать полезную альтернативу.`\n  : `Required response style:\n- 1–4 short paragraphs;\n- 2–3 bullet points if necessary;\n- must take the current context into account;\n- do not invent details that are not in the context;\n- do not write that you cannot do something if you can provide a useful alternative.`}\n`.trim();\n\nconst binary = (() => {\n  const result = {};\n\n  if (photo) {\n    const match = photo.dataUrl.match(/^data:([^;]+);base64,(.*)$/);\n    if (match) {\n      result.photo = {\n        data: match[2],\n        mimeType: match[1] || photo.mimeType || 'image/jpeg',\n        fileName: photo.fileName || `session-photo-${Date.now()}.jpg`\n      };\n    }\n  }\n\n  if (audio) {\n    const audioDataUrl = String(audio.dataUrl ?? audio.data ?? audio.base64 ?? '');\n    const audioMatch = audioDataUrl.match(/^data:([^;]+);base64,(.*)$/);\n    if (audioMatch) {\n      result.audio = {\n        data: audioMatch[2],\n        mimeType: audioMatch[1] || audio.mimeType || 'audio/webm',\n        fileName: audio.fileName || `session-audio-${Date.now()}.webm`\n      };\n    }\n  }\n\n  return Object.keys(result).length ? result : undefined;\n})();\n\nreturn [\n  {\n    json: {\n      lang,\n      message: rawMessage,\n      action,\n      intent,\n      sessionId,\n      mode,\n      context,\n      project: {\n        title: projectTitle,\n        company,\n        university,\n        phase,\n        case: String(project.case ?? project.caseTitle ?? '').trim(),\n        sourceType: String(project.sourceType ?? context.sourceType ?? '').trim(),\n        source: String(project.source ?? '').trim()\n      },\n      material: {\n        title: materialTitle,\n        meta: materialMeta,\n        summary: short(stripHtml(material.content ?? context.materialSummary ?? ''), 420),\n        source: String(material.source ?? context.materialSource ?? '').trim()\n      },\n      photo: photo ? {\n        attached: true,\n        fileName: photo.fileName,\n        mimeType: photo.mimeType,\n        capturedAt: photo.capturedAt,\n        note: photo.note,\n        width: photo.width,\n        height: photo.height\n      } : null,\n      photoAttached: Boolean(photo),\n      photoPrompt,\n      audio: audio ? {\n        attached: true,\n        fileName: String(audio.fileName ?? `session-audio-${Date.now()}.webm`),\n        mimeType: String(audio.mimeType ?? 'audio/webm'),\n        capturedAt: String(audio.capturedAt ?? new Date().toISOString()),\n        transcript: audioTranscript || String(audio.transcript ?? '')\n      } : null,\n      audioTranscript,\n      prompt,\n      session: {\n        active: Boolean(session.active),\n        location: String(session.location ?? '').trim(),\n        lastAction: String(session.lastAction ?? '').trim(),\n        transcript: Array.isArray(session.transcript) ? session.transcript : [],\n        photo: photo ? {\n          attached: true,\n          fileName: photo.fileName,\n          mimeType: photo.mimeType,\n          capturedAt: photo.capturedAt,\n          note: photo.note\n        } : null\n      },\n      history,\n      contextSummary,\n      recommendedActions,\n      tags: [\n        `${lang === 'ru' ? 'Фаза' : 'Phase'}: ${phase}`,\n        mode === 'proactive' ? (lang === 'ru' ? 'Проактивный режим' : 'Proactive mode') : (lang === 'ru' ? 'Фоновый режим' : 'Background mode'),\n        context.type === 'material' ? (lang === 'ru' ? 'Материал' : 'Material') : context.type === 'project' ? (lang === 'ru' ? 'Проект' : 'Project') : context.type === 'session' ? (lang === 'ru' ? 'Сессия' : 'Session') : (lang === 'ru' ? 'Контекст' : 'Context')\n      ]\n    },\n    binary\n  }\n];"
+      },
+      "id": "c3f7705a-7a76-4d66-8b62-05d455faa418",
+      "name": "Context & Intent Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "Follow the provided prompt exactly. Respond in the language specified in the prompt or input context. Be brief, factual, and helpful. Use attached photo/audio tools only when relevant."
+        }
+      },
+      "id": "72f0aabe-037d-4484-aef2-998a83048511",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "maxOutputTokens": 1024,
+          "temperature": 0.4,
+          "topK": 40,
+          "topP": 0.9
+        }
+      },
+      "id": "41d85f5a-b60c-45c8-a9a8-3399fb510293",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1824,
+        224
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CjEkbRbX7MFfd4EZ",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Analyze session photo in Google Gemini",
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-1.5-flash",
+          "cachedResultName": "models/gemini-1.5-flash"
+        },
+        "text": "Analyze the session photo and describe what is visible, prototype elements, notes, risks, and the next step.",
+        "inputType": "binary",
+        "binaryPropertyName": "photo",
+        "options": {}
+      },
+      "id": "fffb4563-b1c0-4812-acd1-7e880ae9c672",
+      "name": "Analyze Session Photo",
+      "type": "@n8n/n8n-nodes-langchain.googleGeminiTool",
+      "typeVersion": 1,
+      "position": [
+        1824,
+        448
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CjEkbRbX7MFfd4EZ",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Analyze session audio in Google Gemini",
+        "resource": "audio",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-1.5-flash",
+          "cachedResultName": "models/gemini-1.5-flash"
+        },
+        "text": "Analyze the session audio recording and describe what was discussed, decisions, risks, overloaded roles, and the next step.",
+        "inputType": "binary",
+        "binaryPropertyName": "audio",
+        "options": {}
+      },
+      "id": "eb54e059-746c-4f0c-a39c-20b9579f4c9e",
+      "name": "Analyze Session Audio",
+      "type": "@n8n/n8n-nodes-langchain.googleGeminiTool",
+      "typeVersion": 1,
+      "position": [
+        2064,
+        448
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CjEkbRbX7MFfd4EZ",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiText = String($json.output ?? $json.text ?? $json.response ?? '').trim();\nconst lang = String($json.lang ?? 'en');\nconst intent = String($json.intent ?? 'general');\nconst mode = String($json.mode ?? (intent === 'general' ? 'background' : 'proactive'));\nconst project = $json.project ?? {};\nconst material = $json.material ?? {};\nconst context = $json.context ?? {};\nconst recommendedActions = Array.isArray($json.recommendedActions) ? $json.recommendedActions : [];\nconst photo = $json.photo ?? null;\nconst audio = $json.audio ?? null;\nconst photoAttached = Boolean($json.photoAttached || photo?.attached);\nconst audioAttached = Boolean($json.audioTranscript || audio?.attached || audio?.transcript);\n\nconst fallbackByIntent = {\n  summary: lang === 'ru'\n    ? '📋 Черновик конспекта готов. Повтори запрос или уточни, что именно нужно зафиксировать.'\n    : '📋 The draft notes are ready. Repeat the request or specify what exactly should be captured.',\n  roles: lang === 'ru'\n    ? '🔄 Не удалось уверенно распределить роли. Уточни, кто перегружен.'\n    : '🔄 I could not confidently suggest role redistribution. Clarify who is overloaded.',\n  analogy: lang === 'ru'\n    ? '💡 Недостаточно данных для точной аналогии. Уточни отрасль или тип решения.'\n    : '💡 Not enough data for an accurate analogy. Clarify the industry or solution type.',\n  analytics: lang === 'ru'\n    ? '📊 Для аналитики нужна дополнительная информация о динамике команды.'\n    : '📊 Analytics require more data about team dynamics.',\n  photo: lang === 'ru'\n    ? '📷 Фото получено, но ответ требует повторить запрос или уточнить задачу.'\n    : '📷 Photo received, but the response needs the request repeated or clarified.',\n  session: lang === 'ru'\n    ? '🎙 Сессия активна. Попробуй задать вопрос ещё раз или запросить конспект.'\n    : '🎙 Session is active. Try asking again or request a summary.',\n  challenge: lang === 'ru'\n    ? '⚡ Вызов готов, но нужен повторный запрос.'\n    : '⚡ The challenge is ready, but a repeated request is needed.',\n  project: lang === 'ru'\n    ? '🏢 Уточни, что именно важно в кейсе: требования, ограничения или следующий шаг.'\n    : '🏢 Clarify what is important about the case: requirements, constraints, or the next step.',\n  memory: lang === 'ru'\n    ? '📚 Уточни материал, который нужно связать с контекстом.'\n    : '📚 Clarify the material that should be linked to the context.',\n  next_step: lang === 'ru'\n    ? '➡️ Следующий шаг зависит от текущей фазы. Уточни задачу.'\n    : '➡️ The next step depends on the current phase. Clarify the task.',\n  general: lang === 'ru'\n    ? 'ИИ временно не смог сформировать ответ. Попробуй переформулировать запрос.'\n    : 'The AI was temporarily unable to form a response. Try rephrasing the request.'\n};\n\nconst reply = aiText || fallbackByIntent[intent] || fallbackByIntent.general;\nconst source = aiText\n  ? (\n      photoAttached && audioAttached\n        ? (lang === 'ru' ? 'Сгенерировано агентом · на основе проекта, фото и аудио' : 'Generated by Agent · Based on project, photo, and audio analysis')\n        : photoAttached\n          ? (lang === 'ru' ? 'Сгенерировано агентом · на основе проекта и фото' : 'Generated by Agent · Based on project and photo analysis')\n          : audioAttached\n            ? (lang === 'ru' ? 'Сгенерировано агентом · на основе проекта и аудио' : 'Generated by Agent · Based on project and audio analysis')\n            : (lang === 'ru' ? 'Сгенерировано агентом · на основе анализа проекта' : 'Generated by Agent · Based on project analysis')\n    )\n  : (lang === 'ru' ? 'Сгенерировано агентом · fallback' : 'Generated by Agent · fallback');\n\nconst contextLabel = context.type === 'material'\n  ? `${lang === 'ru' ? 'Материал' : 'Material'} · ${String(material.title ?? 'untitled')}`\n  : context.type === 'project'\n    ? `${lang === 'ru' ? 'Проект' : 'Project'} · ${String(project.title ?? 'untitled')}`\n    : context.type === 'session'\n      ? (lang === 'ru' ? 'Физическая сессия' : 'Physical session')\n      : (lang === 'ru' ? 'Общий контекст' : 'General context');\n\nconst quickActions = (() => {\n  if (intent === 'summary') return lang === 'ru' ? ['📋 Сохранить конспект', '🧩 Зафиксировать решения', '➡️ Следующий шаг'] : ['📋 Save notes', '🧩 Capture decisions', '➡️ Next step'];\n  if (intent === 'roles') return lang === 'ru' ? ['🔄 Предложить роли', '👥 Проверить загрузку', '📌 Делегировать задачи'] : ['🔄 Suggest roles', '👥 Check workload', '📌 Delegate tasks'];\n  if (intent === 'analogy') return lang === 'ru' ? ['💡 Открыть аналогии', '📚 Проверить источники', '🗣️ Обсудить с командой'] : ['💡 Open analogies', '📚 Check sources', '🗣️ Discuss with team'];\n  if (intent === 'analytics') return lang === 'ru' ? ['📊 Проверить динамику', '⏱️ Оценить паузы', '🧭 Изменить формат'] : ['📊 Check dynamics', '⏱️ Evaluate downtime', '🧭 Change format'];\n  if (intent === 'photo') return lang === 'ru' ? ['📷 Сохранить фото', '📋 Сделать заметки', '💾 Добавить в материалы'] : ['📷 Save photo', '📋 Create notes', '💾 Add to materials'];\n  if (intent === 'session') return lang === 'ru' ? ['🎙 Продолжить запись', '📋 Сформировать конспект', '💾 Сохранить материал'] : ['🎙 Continue recording', '📋 Form notes', '💾 Save material'];\n  if (intent === 'challenge') return lang === 'ru' ? ['⚡ Запустить вызов', '🔁 Сменить формат', '🧪 Начать прототипирование'] : ['⚡ Launch challenge', '🔁 Switch format', '🧪 Start prototyping'];\n  if (intent === 'project') return lang === 'ru' ? ['🏢 Уточнить кейс', '🎓 Проверить контекст', '➡️ Следующий шаг'] : ['🏢 Clarify case', '🎓 Check context', '➡️ Next step'];\n  if (intent === 'memory') return lang === 'ru' ? ['📚 Связать с фазой', '🔎 Найти артефакты', '📋 Сделать заметки'] : ['📚 Link to phase', '🔎 Find artifacts', '📋 Create notes'];\n  return recommendedActions.slice(0, 3);\n})();\n\nreturn [\n  {\n    json: {\n      reply,\n      response: reply,\n      text: reply,\n      intent,\n      lang,\n      mode,\n      project: project.title ?? (lang === 'ru' ? 'Проект' : 'Project'),\n      phase: String(project.phase ?? (lang === 'ru' ? 'Создание' : 'Creation')),\n      contextLabel,\n      source,\n      recommendations: recommendedActions.slice(0, 3),\n      quickActions,\n      memory: {\n        enabled: true,\n        scope: 'project-local',\n        note: lang === 'ru' ? 'Контекст передан из прототипа.' : 'Context passed from prototype.'\n      },\n      uiHints: {\n        showAsAgent: true,\n        allowFollowUp: true,\n        suggestSessionActions: intent === 'session' || context.type === 'session',\n        suggestPhotoReview: photoAttached\n      },\n      photoAttached,\n      photo,\n      audioAttached,\n      audio,\n      timestamp: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "id": "944644fa-4148-4226-bd7d-bef5064ee8c6",
+      "name": "Shape Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2112,
+        -16
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Context & Intent Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context & Intent Engine": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Shape Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Session Photo": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Session Audio": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e9d0efa5-4d0b-4596-b080-3b9c9e09a0bb",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "20fe79a58b3f12a6f32bf280b777aeaa2e5f97fcfd352ea4b3c6bdd356e62bef"
+  },
+  "id": "ZC4480LQE62EKqSb",
+  "tags": []
+}
