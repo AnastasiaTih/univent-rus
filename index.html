@@ -720,13 +720,13 @@
 </div>
 
 <script>
-// ===== N8N INTEGRATION =====
+
 const N8N_WEBHOOK_URL = 'https://nastyatih.app.n8n.cloud/webhook/prototype-ai';
 let chatHistory = [];
 let sessionHistory = [];
 let n8nConnected = false;
 
-// Test n8n connection on load
+
 async function testN8NConnection() {
     const statusEl = document.getElementById('n8nConnectionStatus');
     try {
@@ -754,7 +754,7 @@ async function testN8NConnection() {
     }
 }
 
-// Send message to n8n
+
 async function sendToN8N(message, contextType, extraContext) {
     const history = contextType === 'session' ? sessionHistory : chatHistory;
     const formattedHistory = history.map(h => ({ role: h.role, text: h.text }));
@@ -797,7 +797,7 @@ async function sendToN8N(message, contextType, extraContext) {
         const data = await response.json();
         const reply = data.reply || data.output || data.response || data.message || 'Не удалось получить ответ от агента.';
 
-        // Update connection status
+        
         if (!n8nConnected) {
             n8nConnected = true;
             const statusEl = document.getElementById('n8nConnectionStatus');
@@ -847,12 +847,12 @@ function getFallbackResponse(msg, ctx) {
     return defaults[Math.floor(Math.random() * defaults.length)];
 }
 
-// ===== AUTH =====
+
 function showAuth(pageId) { document.querySelectorAll('.auth-page').forEach(p => p.classList.remove('active')); document.getElementById(pageId).classList.add('active'); }
 function doLogin() { document.querySelectorAll('.auth-page').forEach(p => p.classList.remove('active')); document.getElementById('mainApp').style.display = 'block'; testN8NConnection(); }
 function doLogout() { document.getElementById('mainApp').style.display = 'none'; showAuth('auth-login'); switchPage('main'); }
 
-// ===== NAVIGATION =====
+
 let currentPage = 'main';
 function switchPage(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -868,7 +868,7 @@ function switchPage(page) {
     window.scrollTo(0, 0);
 }
 
-// ===== COLLAPSIBLE =====
+
 function toggleSection(header) {
     const arrow = header.querySelector('.collapsible-arrow');
     const content = header.nextElementSibling;
@@ -876,11 +876,11 @@ function toggleSection(header) {
     content.classList.toggle('open');
 }
 
-// ===== NOTIFICATIONS =====
+
 function toggleNotifications() { document.getElementById('notifOverlay').classList.add('active'); document.getElementById('notifPopup').classList.add('active'); }
 function closeNotifications() { document.getElementById('notifOverlay').classList.remove('active'); document.getElementById('notifPopup').classList.remove('active'); }
 
-// ===== CREATE PROJECT =====
+
 let userProjects = [];
 function openCreateProject() { document.getElementById('createProjectModal').classList.add('active'); }
 function closeCreateProject() { document.getElementById('createProjectModal').classList.remove('active'); }
@@ -913,7 +913,7 @@ function openUserProjectDetail(id) {
     switchPage('project-detail');
 }
 
-// ===== FILTER PROJECTS =====
+
 function filterProjects(chip, type) {
     document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
@@ -922,7 +922,7 @@ function filterProjects(chip, type) {
     document.querySelectorAll('.user-project-card').forEach(el => { el.style.display = (type === 'all' || type === 'student') ? 'block' : 'none'; });
 }
 
-// ===== PROJECT DETAILS =====
+
 const projectsData = {
     'logistics': { title: 'Оптимизация логистики склада', company: 'От: IT-Corp', desc: 'Разработка алгоритма маршрутизации для оптимизации логистики склада. Python, Аналитика данных.', skills: ['Python','SQL','Аналитика'] },
     'app': { title: 'Мобильное приложение для студентов', company: 'От: Студент', desc: 'Приложение для расписания и заметок. Flutter, UI/UX, Бэкенд.', skills: ['Flutter','Firebase','UX'] },
@@ -938,7 +938,7 @@ function openProjectDetail(type) {
     switchPage('project-detail');
 }
 
-// ===== MATERIALS DATA =====
+
 const materialsData = {
     'brief': { title: 'Бриф от компании', heading: '📋 Бриф: AI-инструмент для анализа фидбека', meta: 'Исходные данные от компании-партнёра · 12 января 2025', body: 'Компания получает большое количество отзывов от пользователей через разные каналы: мобильное приложение, поддержку, социальные сети, формы обратной связи. Но эти данные разрознены, их слишком много для ручного анализа, и ценные инсайты теряются. Нужно создать AI-инструмент для автоматического сбора, анализа и структурирования пользовательского фидбека.', related: [{id:'interview',label:'Результаты интервью'},{id:'sources',label:'Схема источников фидбека'}] },
     'interview': { title: 'Интервью', heading: '📄 Результаты интервью с пользователями', meta: 'PDF · 5 интервью · 8 страниц', body: 'Проведено 5 интервью с пользователями. Ключевые инсайты:\n\n• 80% респондентов не могут быстро найти нужную информацию\n• 70% отмечают, что их отзывы «уходят в пустоту»\n• Основные категории: баги, интерфейс, поддержка, персонализация\n\nРекомендуем сгруппировать фидбек по этим категориям для приоритизации.', related: [{id:'analysis',label:'Анализ ИИ-агента'},{id:'brief',label:'Бриф от компании'}] },
@@ -959,7 +959,7 @@ function openMaterial(type) {
     switchPage('material');
 }
 
-// ===== TIPS DATA =====
+
 const tipsData = {
     'tip1': { title: 'Совет по вашей роли', heading: '💡 Совет по вашей роли как лидера проекта', meta: 'ИИ-агент · Персональная рекомендация', body: 'Как лидер проекта по AI-анализу фидбека, попробуйте делегировать сбор и первичную обработку данных Петрову Алексею (аналитик). Это позволит вам сосредоточиться на координации команды, подготовке к валидации с продуктовой командой компании и обеспечении качества итоговой презентации. Ваша роль — стратегическое видение, а не операционная работа.' },
     'tip2': { title: 'Рекомендация по работе', heading: '📈 Рекомендация по работе команды', meta: 'ИИ-агент · На основе анализа активности', body: 'Ваша активность снизилась на 30% за последние 3 дня. Рекомендуем провести короткую сессию синхронизации с командой (30 минут). Обсудите прогресс по каждой задаче: Дмитрий — ML-модель, Мария — дизайн дашборда, Игорь — интеграция API. Определите blockers и перераспределите задачи при необходимости.' },
@@ -980,7 +980,7 @@ function openTipDetail(type) {
     switchPage('tip');
 }
 
-// ===== MAIN AGENT CHAT =====
+
 function handleChatKey(event) { if (event.key === 'Enter') sendChat(); }
 function focusChatInput() { setTimeout(() => { const el = document.getElementById('chatInput'); if (el) el.focus(); }, 300); }
 
@@ -1010,7 +1010,7 @@ async function sendChat() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// ===== SESSION =====
+
 let sessionInterval = null;
 let sessionSeconds = 0;
 let sessionNotes = [];
@@ -1057,7 +1057,7 @@ async function sendSessionChat() {
     }, 800);
 }
 
-// Quick Actions
+
 function quickAction(action) {
     const actions = {
         summary: { msg: 'Создай конспект текущей сессии', response: ' Конспект сессии:\n\n Сессия: AI-анализ фидбека\n• Обсуждены 4 канала сбора данных\n• Определены категории: баги (45%), UX (30%), поддержка (15%), предложения (10%)\n• Мария начала дизайн дашборда\n• Дмитрий работает над NLP-моделью\n\n✅ Следующие шаги:\n• Завершить дизайн дашборда\n• Подготовить демо-данные\n• Начать тестирование с пользователями' },
@@ -1080,7 +1080,7 @@ function quickAction(action) {
     }, 600);
 }
 
-// Photo actions
+
 function takePhoto() {
     const photoArea = document.getElementById('photoArea');
     photoArea.innerHTML = `<svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
@@ -1120,7 +1120,7 @@ function savePhoto() {
     alert('Фото сохранено в материалы проекта!');
 }
 
-// End session — save to materials
+
 function endSession() {
     if (sessionInterval) clearInterval(sessionInterval);
 
@@ -1151,10 +1151,10 @@ function endSession() {
     alert('Сессия завершена! Конспект сохранён в материалы проекта.');
 }
 
-// ===== MODAL =====
+
 document.getElementById('createProjectModal').addEventListener('click', function(e) { if (e.target === this) closeCreateProject(); });
 
-// ===== UTILS =====
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
